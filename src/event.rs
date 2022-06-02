@@ -47,6 +47,30 @@ pub struct ToggleCounter {
 
 #[derive(Serialize, Debug, Deserialize)]
 pub struct PackedData {
+    #[serde(default)]
     pub events: Vec<AccessEvent>,
     pub access: Access,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PackedData;
+
+    #[test]
+    fn test_packed_data_without_events() {
+        let s = r#"
+        {
+            "access": {
+                "startTime": 1,
+                "endTime": 1,
+                "counters": {}
+            }
+        }
+        "#;
+
+        let p = serde_json::from_str::<PackedData>(s);
+        assert!(p.is_ok());
+        let p = p.unwrap();
+        assert!(p.events.is_empty());
+    }
 }
