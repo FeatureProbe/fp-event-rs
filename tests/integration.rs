@@ -69,7 +69,8 @@ mod tests {
         let auth = HeaderValue::from_static("auth");
         let flush_interval = Duration::from_secs(1);
         let capacity = 10;
-        EventRecorder::new(events_url, auth, flush_interval, capacity)
+        let user_agent = "Rust".to_owned();
+        EventRecorder::new(events_url, auth, user_agent, flush_interval, capacity)
     }
 
     #[derive(Clone)]

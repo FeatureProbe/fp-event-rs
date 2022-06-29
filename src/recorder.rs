@@ -17,12 +17,14 @@ impl EventRecorder {
     pub fn new(
         events_url: Url,
         auth: HeaderValue,
+        user_agent: String,
         flush_interval: Duration,
         capacity: usize,
     ) -> Self {
         let slf = Self {
             inner: Arc::new(Inner {
                 auth,
+                user_agent,
                 events_url,
                 flush_interval,
                 capacity,
@@ -83,6 +85,7 @@ impl EventRecorder {
 #[derive(Debug)]
 struct Inner {
     pub auth: HeaderValue,
+    pub user_agent: String,
     pub events_url: Url,
     pub flush_interval: Duration,
     pub capacity: usize,
@@ -93,6 +96,7 @@ struct Inner {
 impl Inner {
     #[cfg(feature = "use_tokio")]
     async fn do_async_flush(&self, client: &Client) {
+        use reqwest::header::USER_AGENT;
         use tracing::info;
 
         let events = match self.take_events() {
@@ -103,7 +107,8 @@ impl Inner {
         let packed_data = self.build_packed_data(events);
         let request = client
             .request(Method::POST, self.events_url.clone())
-            .header(AUTHORIZATION, self.auth.clone())
+            .header(AUTHORIZATION, &self.auth)
+            .header(USER_AGENT, &self.user_agent)
             .timeout(self.flush_interval)
             .json(&packed_data);
 
@@ -139,6 +144,7 @@ impl Inner {
                 "authorization",
                 self.auth.to_str().expect("already valid header value"),
             )
+            .set("user-agent", &self.user_agent)
             .timeout(self.flush_interval)
             .set("Content-Type", "application/json")
             .send_string(&body)
