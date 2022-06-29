@@ -243,7 +243,7 @@ dependencies = [
 
 [[package]]
 name = "feature-probe-event"
-version = "1.0.2"
+version = "1.0.3"
 dependencies = [
  "axum",
  "axum-extra",
