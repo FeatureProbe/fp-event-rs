@@ -35,7 +35,9 @@ pub async fn post_events<T>(
 where
     T: EventHandler + Clone + Send + Sync + 'static,
 {
-    handler.handle_events(sdk_key, user_agent.to_string(), data).await?;
+    handler
+        .handle_events(sdk_key, user_agent.to_string(), data)
+        .await?;
     let status = StatusCode::OK;
     let body = "";
     Ok((status, cors_headers(), body).into_response())
