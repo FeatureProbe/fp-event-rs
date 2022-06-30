@@ -81,6 +81,7 @@ mod tests {
         async fn handle_events(
             &self,
             sdk_key: String,
+            _user_agent: String,
             mut data: VecDeque<PackedData>,
         ) -> Result<Response, FPEventError> {
             assert!(sdk_key.len() > 0);

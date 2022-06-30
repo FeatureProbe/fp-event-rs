@@ -2,7 +2,7 @@ use crate::event::PackedData;
 use axum::{
     async_trait,
     extract::{Extension, Json},
-    headers::HeaderName,
+    headers::{HeaderName, UserAgent},
     http::{
         header::{self, AUTHORIZATION},
         StatusCode,
@@ -21,6 +21,7 @@ pub trait EventHandler {
     async fn handle_events(
         &self,
         sdk_key: String,
+        user_agent: String,
         data: VecDeque<PackedData>,
     ) -> Result<Response, FPEventError>;
 }
@@ -28,12 +29,13 @@ pub trait EventHandler {
 pub async fn post_events<T>(
     Json(data): Json<VecDeque<PackedData>>,
     TypedHeader(SdkAuthorization(sdk_key)): TypedHeader<SdkAuthorization>,
+    TypedHeader(user_agent): TypedHeader<UserAgent>,
     Extension(handler): Extension<T>,
 ) -> Result<Response, FPEventError>
 where
     T: EventHandler + Clone + Send + Sync + 'static,
 {
-    handler.handle_events(sdk_key, data).await?;
+    handler.handle_events(sdk_key, user_agent.to_string(), data).await?;
     let status = StatusCode::OK;
     let body = "";
     Ok((status, cors_headers(), body).into_response())
