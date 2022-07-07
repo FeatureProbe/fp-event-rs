@@ -97,7 +97,7 @@ impl Inner {
     #[cfg(feature = "use_tokio")]
     async fn do_async_flush(&self, client: &Client) {
         use reqwest::header::USER_AGENT;
-        use tracing::info;
+        use tracing::debug;
 
         let events = match self.take_events() {
             Some(v) if !v.is_empty() => v,
@@ -113,12 +113,13 @@ impl Inner {
             .json(&packed_data);
 
         //TODO: report failure
+        debug!("flush req: {:?}", request);
         match request.send().await {
             Err(e) => {
                 error!("event post error: {}", e);
                 self.set_packed_data(packed_data); // put back
             }
-            Ok(r) => info!("{:?}", r),
+            Ok(r) => debug!("flush resp: {:?}", r),
         }
     }
 

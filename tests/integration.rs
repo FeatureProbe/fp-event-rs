@@ -13,7 +13,7 @@ mod tests {
         event::{AccessEvent, PackedData},
         recorder::EventRecorder,
     };
-    use headers::HeaderValue;
+    use headers::{HeaderMap, HeaderValue};
     use lazy_static::lazy_static;
     use parking_lot::Mutex;
     use reqwest::StatusCode;
@@ -82,6 +82,7 @@ mod tests {
             &self,
             sdk_key: String,
             _user_agent: String,
+            _headers: HeaderMap,
             mut data: VecDeque<PackedData>,
         ) -> Result<Response, FPEventError> {
             assert!(sdk_key.len() > 0);

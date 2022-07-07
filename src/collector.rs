@@ -10,7 +10,7 @@ use axum::{
     response::{IntoResponse, Response},
     TypedHeader,
 };
-use headers::{Error, Header, HeaderValue};
+use headers::{Error, Header, HeaderMap, HeaderValue};
 use serde::Deserialize;
 use serde_json::json;
 use std::collections::VecDeque;
@@ -22,6 +22,7 @@ pub trait EventHandler {
         &self,
         sdk_key: String,
         user_agent: String,
+        headers: HeaderMap,
         data: VecDeque<PackedData>,
     ) -> Result<Response, FPEventError>;
 }
@@ -30,13 +31,14 @@ pub async fn post_events<T>(
     Json(data): Json<VecDeque<PackedData>>,
     TypedHeader(SdkAuthorization(sdk_key)): TypedHeader<SdkAuthorization>,
     TypedHeader(user_agent): TypedHeader<UserAgent>,
+    headers: HeaderMap,
     Extension(handler): Extension<T>,
 ) -> Result<Response, FPEventError>
 where
     T: EventHandler + Clone + Send + Sync + 'static,
 {
     handler
-        .handle_events(sdk_key, user_agent.to_string(), data)
+        .handle_events(sdk_key, user_agent.to_string(), headers, data)
         .await?;
     let status = StatusCode::OK;
     let body = "";
