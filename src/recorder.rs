@@ -1,6 +1,6 @@
 use crate::event::{Access, AccessEvent, CountValue, PackedData, ToggleCounter, Variation};
 use headers::HeaderValue;
-use parking_lot::Mutex;
+use parking_lot::{Mutex, RwLock};
 #[cfg(feature = "use_tokio")]
 use reqwest::{header::AUTHORIZATION, Client, Method};
 use std::collections::{HashMap, VecDeque};
@@ -20,6 +20,7 @@ impl EventRecorder {
         user_agent: String,
         flush_interval: Duration,
         capacity: usize,
+        should_stop: Arc<RwLock<bool>>,
     ) -> Self {
         let slf = Self {
             inner: Arc::new(Inner {
@@ -30,6 +31,7 @@ impl EventRecorder {
                 capacity,
                 incoming_events: Default::default(),
                 packed_data: Default::default(),
+                should_stop,
             }),
         };
 
@@ -54,6 +56,9 @@ impl EventRecorder {
             let mut interval = tokio::time::interval(inner.flush_interval);
             loop {
                 inner.do_async_flush(&client).await;
+                if *inner.should_stop.read() {
+                    break;
+                }
                 interval.tick().await;
             }
         });
@@ -64,6 +69,9 @@ impl EventRecorder {
         let inner = self.inner.clone();
         std::thread::spawn(move || loop {
             inner.do_flush();
+            if *inner.should_stop.read() {
+                break;
+            }
             std::thread::sleep(inner.flush_interval);
         });
     }
@@ -91,6 +99,7 @@ struct Inner {
     pub capacity: usize,
     pub incoming_events: Mutex<Option<Vec<AccessEvent>>>,
     pub packed_data: Mutex<Option<VecDeque<PackedData>>>,
+    pub should_stop: Arc<RwLock<bool>>,
 }
 
 impl Inner {

@@ -15,10 +15,10 @@ mod tests {
     };
     use headers::{HeaderMap, HeaderValue};
     use lazy_static::lazy_static;
-    use parking_lot::Mutex;
+    use parking_lot::{Mutex, RwLock};
     use reqwest::StatusCode;
     use serde_json::json;
-    use std::{collections::VecDeque, net::SocketAddr, time::Duration};
+    use std::{collections::VecDeque, net::SocketAddr, sync::Arc, time::Duration};
 
     lazy_static! {
         static ref IS_SUCCESS: Mutex<bool> = Mutex::new(false);
@@ -70,7 +70,15 @@ mod tests {
         let flush_interval = Duration::from_secs(1);
         let capacity = 10;
         let user_agent = "Rust".to_owned();
-        EventRecorder::new(events_url, auth, user_agent, flush_interval, capacity)
+        let should_stop = Arc::new(RwLock::new(false));
+        EventRecorder::new(
+            events_url,
+            auth,
+            user_agent,
+            flush_interval,
+            capacity,
+            should_stop,
+        )
     }
 
     #[derive(Clone)]
