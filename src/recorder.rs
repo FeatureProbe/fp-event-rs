@@ -39,6 +39,17 @@ impl EventRecorder {
         slf
     }
 
+    #[cfg(feature = "use_tokio")]
+    pub async fn flush(&self) {
+        let client = reqwest::Client::new();
+        self.inner.do_async_flush(&client).await;
+    }
+
+    #[cfg(feature = "use_std")]
+    pub fn flush(&self) {
+        self.inner.do_flush()
+    }
+
     fn start(&self) {
         #[cfg(feature = "use_tokio")]
         self.tokio_start();
@@ -56,10 +67,10 @@ impl EventRecorder {
             let mut interval = tokio::time::interval(inner.flush_interval);
             loop {
                 inner.do_async_flush(&client).await;
+                interval.tick().await;
                 if *inner.should_stop.read() {
                     break;
                 }
-                interval.tick().await;
             }
         });
     }
@@ -69,10 +80,10 @@ impl EventRecorder {
         let inner = self.inner.clone();
         std::thread::spawn(move || loop {
             inner.do_flush();
+            std::thread::sleep(inner.flush_interval);
             if *inner.should_stop.read() {
                 break;
             }
-            std::thread::sleep(inner.flush_interval);
         });
     }
 
