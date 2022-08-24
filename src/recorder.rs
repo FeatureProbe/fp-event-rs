@@ -39,15 +39,19 @@ impl EventRecorder {
         slf
     }
 
-    #[cfg(feature = "use_tokio")]
-    pub async fn flush(&self) {
-        let client = reqwest::Client::new();
-        self.inner.do_async_flush(&client).await;
-    }
-
-    #[cfg(feature = "use_std")]
     pub fn flush(&self) {
-        self.inner.do_flush()
+        #[cfg(feature = "use_std")]
+        self.inner.do_flush();
+        #[cfg(fature = "use_tokio")]
+        {
+            let (tx, rx) = std::sync::mpsc::sync_channel(1);
+            tokio::spawn(async move {
+                let client = reqwest::Client::new();
+                self.inner.do_async_flush(&client).await;
+                let _ = tx.send(());
+            });
+            let _ = rx.recv();
+        }
     }
 
     fn start(&self) {
