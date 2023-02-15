@@ -111,8 +111,6 @@ struct Inner {
     pub events_url: Url,
     pub flush_interval: Duration,
     pub capacity: usize,
-    // pub incoming_access_events: Mutex<Option<Vec<AccessEvent>>>,
-    // pub incoming_custom_events: Mutex<Option<Vec<CustomEvent>>>,
     pub incoming_events: Mutex<Option<Vec<Event>>>,
     pub packed_data: Mutex<Option<VecDeque<PackedData>>>,
     pub should_stop: Arc<RwLock<bool>>,
