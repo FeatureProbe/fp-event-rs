@@ -8,6 +8,7 @@ mod tests {
         routing::post,
         Router,
     };
+    use feature_probe_event::event::Event;
     use feature_probe_event::{
         collector::{cors_headers, post_events, EventHandler, FPEventError},
         event::{AccessEvent, CustomEvent},
@@ -30,7 +31,7 @@ mod tests {
 
         setup_collector().await;
         let recorder = setup_recorder();
-        let event = AccessEvent {
+        let access_event = AccessEvent {
             kind: "access".to_string(),
             time: 1,
             key: "key".to_owned(),
@@ -51,17 +52,17 @@ mod tests {
             value: None,
         };
 
-        recorder.record_access(event.clone());
-        recorder.record_access(event.clone());
-        recorder.record_access(event.clone());
-        recorder.record_access(event.clone());
-        recorder.record_access(event);
+        recorder.record_event(Event::AccessEvent(access_event.clone()));
+        recorder.record_event(Event::AccessEvent(access_event.clone()));
+        recorder.record_event(Event::AccessEvent(access_event.clone()));
+        recorder.record_event(Event::AccessEvent(access_event.clone()));
+        recorder.record_event(Event::AccessEvent(access_event.clone()));
 
-        recorder.record_custom_event(custom_event.clone());
-        recorder.record_custom_event(custom_event.clone());
-        recorder.record_custom_event(custom_event.clone());
-        recorder.record_custom_event(custom_event.clone());
-        recorder.record_custom_event(custom_event);
+        recorder.record_event(Event::CustomEvent(custom_event.clone()));
+        recorder.record_event(Event::CustomEvent(custom_event.clone()));
+        recorder.record_event(Event::CustomEvent(custom_event.clone()));
+        recorder.record_event(Event::CustomEvent(custom_event.clone()));
+        recorder.record_event(Event::CustomEvent(custom_event.clone()));
 
         tokio::time::sleep(Duration::from_secs(3)).await;
 
