@@ -1,4 +1,4 @@
-use crate::event::{Access, AccessEvent, CountValue, PackedData, ToggleCounter, Variation};
+use crate::event::{Access, CountValue, Event, PackedData, ToggleCounter, Variation};
 use headers::HeaderValue;
 use parking_lot::{Mutex, RwLock};
 #[cfg(feature = "use_tokio")]
@@ -92,7 +92,7 @@ impl EventRecorder {
     }
 
     // TODO: performance
-    pub fn record_access(&self, event: AccessEvent) {
+    pub fn record_event(&self, event: Event) {
         let mut guard = self.inner.incoming_events.lock();
         let mut events = guard.take();
 
@@ -100,7 +100,6 @@ impl EventRecorder {
             None => events = Some(vec![event]),
             Some(ref mut v) => v.push(event),
         };
-
         *guard = events;
     }
 }
@@ -112,7 +111,7 @@ struct Inner {
     pub events_url: Url,
     pub flush_interval: Duration,
     pub capacity: usize,
-    pub incoming_events: Mutex<Option<Vec<AccessEvent>>>,
+    pub incoming_events: Mutex<Option<Vec<Event>>>,
     pub packed_data: Mutex<Option<VecDeque<PackedData>>>,
     pub should_stop: Arc<RwLock<bool>>,
 }
@@ -179,7 +178,7 @@ impl Inner {
         }
     }
 
-    fn take_events(&self) -> Option<Vec<AccessEvent>> {
+    fn take_events(&self) -> Option<Vec<Event>> {
         let mut guard = self.incoming_events.lock();
         guard.take()
     }
@@ -194,29 +193,46 @@ impl Inner {
         *guard = packed_data
     }
 
-    fn build_access(&self, events: &Vec<AccessEvent>) -> Access {
+    fn build_events(&self, events: &Vec<Event>) -> Vec<Event> {
+        let mut res: Vec<Event> = Vec::new();
+        for e in events {
+            match e {
+                Event::AccessEvent(access_event) => {
+                    if access_event.track_access_events {
+                        res.push(Event::AccessEvent(access_event.clone()));
+                    }
+                }
+                _ => res.push(e.clone()),
+            }
+        }
+        res
+    }
+
+    fn build_access(&self, events: &Vec<Event>) -> Access {
         let mut start_time = u128::MAX;
         let mut end_time = 0;
         let mut counters: HashMap<Variation, CountValue> = HashMap::new();
 
         for e in events {
-            if e.time < start_time {
-                start_time = e.time;
-            }
-            if e.time > end_time {
-                end_time = e.time
-            }
-            let variation = Variation {
-                key: e.key.clone(),
-                version: e.version,
-                index: e.index,
-            };
+            if let Event::AccessEvent(access_event) = e {
+                if access_event.time < start_time {
+                    start_time = access_event.time;
+                }
+                if access_event.time > end_time {
+                    end_time = access_event.time
+                }
+                let variation = Variation {
+                    key: access_event.key.clone(),
+                    version: access_event.version,
+                    index: access_event.variation_index,
+                };
 
-            let count_value = counters.entry(variation).or_insert(CountValue {
-                count: 0,
-                value: e.value.clone(),
-            });
-            count_value.count += 1;
+                let count_value = counters.entry(variation).or_insert(CountValue {
+                    count: 0,
+                    value: access_event.value.clone(),
+                });
+                count_value.count += 1;
+            }
         }
 
         let mut access = Access {
@@ -239,8 +255,9 @@ impl Inner {
         access
     }
 
-    fn build_packed_data(&self, events: Vec<AccessEvent>) -> Option<VecDeque<PackedData>> {
+    fn build_packed_data(&self, events: Vec<Event>) -> Option<VecDeque<PackedData>> {
         let access = self.build_access(&events);
+        let events = self.build_events(&events);
         let packed_data = PackedData { events, access };
         let mut packed_data_vec = self.take_packed_data();
         match packed_data_vec {

@@ -1,4 +1,3 @@
-use crate::event::PackedData;
 use axum::{
     async_trait,
     extract::{Extension, Json},
@@ -12,7 +11,7 @@ use axum::{
 };
 use headers::{Error, Header, HeaderMap, HeaderValue};
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{json, Value};
 use std::collections::VecDeque;
 use thiserror::Error;
 
@@ -23,12 +22,12 @@ pub trait EventHandler {
         sdk_key: String,
         user_agent: String,
         headers: HeaderMap,
-        data: VecDeque<PackedData>,
+        data: VecDeque<Value>,
     ) -> Result<Response, FPEventError>;
 }
 
 pub async fn post_events<T>(
-    Json(data): Json<VecDeque<PackedData>>,
+    Json(data): Json<VecDeque<Value>>,
     TypedHeader(SdkAuthorization(sdk_key)): TypedHeader<SdkAuthorization>,
     TypedHeader(user_agent): TypedHeader<UserAgent>,
     headers: HeaderMap,
