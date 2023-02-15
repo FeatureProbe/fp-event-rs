@@ -1,4 +1,6 @@
-use crate::event::{Access, AccessEvent, CountValue, PackedData, ToggleCounter, Variation};
+use crate::event::{
+    Access, AccessEvent, CountValue, CustomEvent, Event, PackedData, ToggleCounter, Variation,
+};
 use headers::HeaderValue;
 use parking_lot::{Mutex, RwLock};
 #[cfg(feature = "use_tokio")]
@@ -29,7 +31,8 @@ impl EventRecorder {
                 events_url,
                 flush_interval,
                 capacity,
-                incoming_events: Default::default(),
+                incoming_access_events: Default::default(),
+                incoming_custom_events: Default::default(),
                 packed_data: Default::default(),
                 should_stop,
             }),
@@ -93,7 +96,19 @@ impl EventRecorder {
 
     // TODO: performance
     pub fn record_access(&self, event: AccessEvent) {
-        let mut guard = self.inner.incoming_events.lock();
+        let mut guard = self.inner.incoming_access_events.lock();
+        let mut events = guard.take();
+
+        match events {
+            None => events = Some(vec![event]),
+            Some(ref mut v) => v.push(event),
+        };
+
+        *guard = events;
+    }
+
+    pub fn record_custom_event(&self, event: CustomEvent) {
+        let mut guard = self.inner.incoming_custom_events.lock();
         let mut events = guard.take();
 
         match events {
@@ -112,7 +127,8 @@ struct Inner {
     pub events_url: Url,
     pub flush_interval: Duration,
     pub capacity: usize,
-    pub incoming_events: Mutex<Option<Vec<AccessEvent>>>,
+    pub incoming_access_events: Mutex<Option<Vec<AccessEvent>>>,
+    pub incoming_custom_events: Mutex<Option<Vec<CustomEvent>>>,
     pub packed_data: Mutex<Option<VecDeque<PackedData>>>,
     pub should_stop: Arc<RwLock<bool>>,
 }
@@ -123,12 +139,17 @@ impl Inner {
         use reqwest::header::USER_AGENT;
         use tracing::debug;
 
-        let events = match self.take_events() {
+        let access_events = match self.take_access_events() {
             Some(v) if !v.is_empty() => v,
             _ => return,
         };
 
-        let packed_data = self.build_packed_data(events);
+        let custom_events = match self.take_custom_events() {
+            Some(v) if !v.is_empty() => v,
+            _ => return,
+        };
+
+        let packed_data = self.build_packed_data(access_events, custom_events);
         let request = client
             .request(Method::POST, self.events_url.clone())
             .header(AUTHORIZATION, &self.auth)
@@ -149,12 +170,17 @@ impl Inner {
 
     #[cfg(feature = "use_std")]
     fn do_flush(&self) {
-        let events = match self.take_events() {
+        let access_events = match self.take_access_events() {
             Some(v) if !v.is_empty() => v,
             _ => return,
         };
 
-        let packed_data = self.build_packed_data(events);
+        let custom_events = match self.take_custom_events() {
+            Some(v) if !v.is_empty() => v,
+            _ => return,
+        };
+
+        let packed_data = self.build_packed_data(access_events, custom_events);
         let body = match serde_json::to_string(&packed_data) {
             Err(e) => {
                 error!("{:?}", e);
@@ -179,8 +205,13 @@ impl Inner {
         }
     }
 
-    fn take_events(&self) -> Option<Vec<AccessEvent>> {
-        let mut guard = self.incoming_events.lock();
+    fn take_access_events(&self) -> Option<Vec<AccessEvent>> {
+        let mut guard = self.incoming_access_events.lock();
+        guard.take()
+    }
+
+    fn take_custom_events(&self) -> Option<Vec<CustomEvent>> {
+        let mut guard = self.incoming_custom_events.lock();
         guard.take()
     }
 
@@ -194,12 +225,29 @@ impl Inner {
         *guard = packed_data
     }
 
-    fn build_access(&self, events: &Vec<AccessEvent>) -> Access {
+    fn build_events(
+        &self,
+        access_events: &Vec<AccessEvent>,
+        custom_events: &Vec<CustomEvent>,
+    ) -> Vec<Event> {
+        let mut events: Vec<Event> = Vec::new();
+        for e in custom_events {
+            events.push(Event::CustomEvent(e.clone()));
+        }
+        for e in access_events {
+            if e.track_access_events {
+                events.push(Event::AccessEvent(e.clone()));
+            }
+        }
+        events
+    }
+
+    fn build_access(&self, access_events: &Vec<AccessEvent>) -> Access {
         let mut start_time = u128::MAX;
         let mut end_time = 0;
         let mut counters: HashMap<Variation, CountValue> = HashMap::new();
 
-        for e in events {
+        for e in access_events {
             if e.time < start_time {
                 start_time = e.time;
             }
@@ -209,7 +257,7 @@ impl Inner {
             let variation = Variation {
                 key: e.key.clone(),
                 version: e.version,
-                index: e.index,
+                index: e.variation_index,
             };
 
             let count_value = counters.entry(variation).or_insert(CountValue {
@@ -239,8 +287,13 @@ impl Inner {
         access
     }
 
-    fn build_packed_data(&self, events: Vec<AccessEvent>) -> Option<VecDeque<PackedData>> {
-        let access = self.build_access(&events);
+    fn build_packed_data(
+        &self,
+        access_events: Vec<AccessEvent>,
+        custom_events: Vec<CustomEvent>,
+    ) -> Option<VecDeque<PackedData>> {
+        let access = self.build_access(&access_events);
+        let events = self.build_events(&access_events, &custom_events);
         let packed_data = PackedData { events, access };
         let mut packed_data_vec = self.take_packed_data();
         match packed_data_vec {

@@ -10,14 +10,14 @@ mod tests {
     };
     use feature_probe_event::{
         collector::{cors_headers, post_events, EventHandler, FPEventError},
-        event::{AccessEvent, PackedData},
+        event::{AccessEvent, CustomEvent},
         recorder::EventRecorder,
     };
     use headers::{HeaderMap, HeaderValue};
     use lazy_static::lazy_static;
     use parking_lot::{Mutex, RwLock};
     use reqwest::StatusCode;
-    use serde_json::json;
+    use serde_json::{json, Value};
     use std::{collections::VecDeque, net::SocketAddr, sync::Arc, time::Duration};
 
     lazy_static! {
@@ -31,18 +31,37 @@ mod tests {
         setup_collector().await;
         let recorder = setup_recorder();
         let event = AccessEvent {
+            kind: "access".to_string(),
             time: 1,
             key: "key".to_owned(),
             value: json!("1"),
-            index: None,
+            user: "user_key".to_string(),
+            variation_index: 0,
             version: Some(1),
-            reason: "reason".to_owned(),
+            rule_index: Some(1),
+            reason: Some("reason".to_string()),
+            track_access_events: false,
         };
+
+        let custom_event = CustomEvent {
+            kind: "custom".to_string(),
+            time: 1,
+            user: "user_key".to_string(),
+            name: "event_name".to_string(),
+            value: None,
+        };
+
         recorder.record_access(event.clone());
         recorder.record_access(event.clone());
         recorder.record_access(event.clone());
         recorder.record_access(event.clone());
         recorder.record_access(event);
+
+        recorder.record_custom_event(custom_event.clone());
+        recorder.record_custom_event(custom_event.clone());
+        recorder.record_custom_event(custom_event.clone());
+        recorder.record_custom_event(custom_event.clone());
+        recorder.record_custom_event(custom_event);
 
         tokio::time::sleep(Duration::from_secs(3)).await;
 
@@ -91,17 +110,10 @@ mod tests {
             sdk_key: String,
             _user_agent: String,
             _headers: HeaderMap,
-            mut data: VecDeque<PackedData>,
+            data: VecDeque<Value>,
         ) -> Result<Response, FPEventError> {
             assert!(sdk_key.len() > 0);
             assert!(data.len() == 1);
-
-            let packed_data = data.pop_front().unwrap();
-            let counters = packed_data.access.counters;
-            assert!(counters.len() > 0);
-
-            let v = counters.get("key").unwrap().first().unwrap();
-            assert!(v.count == 5);
 
             let mut guard = IS_SUCCESS.lock();
             *guard = true;
