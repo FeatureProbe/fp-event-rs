@@ -7,6 +7,7 @@ use std::collections::HashMap;
 pub enum Event {
     AccessEvent(AccessEvent),
     CustomEvent(CustomEvent),
+    DebugEvent(DebugEvent),
 }
 
 #[derive(Serialize, Debug, Deserialize, Clone)]
@@ -16,6 +17,7 @@ pub struct AccessEvent {
     pub time: u128,
     pub key: String,
     pub user: String,
+    pub user_detail: Value,
     pub value: Value,
     pub variation_index: usize,
     pub version: Option<u64>,
@@ -23,6 +25,8 @@ pub struct AccessEvent {
     pub reason: Option<String>,
     #[serde(skip)]
     pub track_access_events: bool,
+    #[serde(skip)]
+    pub track_debug_until_date: u64,
 }
 
 #[derive(Serialize, Debug, Deserialize, Clone)]
@@ -33,6 +37,21 @@ pub struct CustomEvent {
     pub user: String,
     pub name: String,
     pub value: Option<f64>,
+}
+
+#[derive(Serialize, Debug, Deserialize, Clone)]
+#[serde(rename_all = "camelCase")]
+pub struct DebugEvent {
+    pub kind: String,
+    pub time: u128,
+    pub key: String,
+    pub user: String,
+    pub user_detail: Value,
+    pub value: Value,
+    pub variation_index: usize,
+    pub version: Option<u64>,
+    pub rule_index: Option<usize>,
+    pub reason: Option<String>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash)]
