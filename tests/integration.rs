@@ -37,13 +37,10 @@ mod tests {
             key: "key".to_owned(),
             value: json!("1"),
             user: "user_key".to_string(),
-            user_detail: serde_json::to_value("{}").unwrap(),
             variation_index: 0,
             version: Some(1),
             rule_index: Some(1),
-            reason: Some("reason".to_string()),
             track_access_events: false,
-            track_debug_until_date: 0,
         };
 
         let custom_event = CustomEvent {

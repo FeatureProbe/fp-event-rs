@@ -1,12 +1,9 @@
-use crate::event::{
-    Access, AccessEvent, CountValue, DebugEvent, Event, PackedData, ToggleCounter, Variation,
-};
+use crate::event::{Access, CountValue, Event, PackedData, ToggleCounter, Variation};
 use headers::HeaderValue;
 use parking_lot::{Mutex, RwLock};
 #[cfg(feature = "use_tokio")]
 use reqwest::{header::AUTHORIZATION, Client, Method};
 use std::collections::{HashMap, VecDeque};
-use std::time::{SystemTime, UNIX_EPOCH};
 use std::{sync::Arc, time::Duration};
 use tracing::error;
 use url::Url;
@@ -204,35 +201,11 @@ impl Inner {
                     if access_event.track_access_events {
                         res.push(Event::AccessEvent(access_event.clone()));
                     }
-                    let now = SystemTime::now()
-                        .duration_since(UNIX_EPOCH)
-                        .expect("Time went backwards");
-                    let millis = now.as_secs() * 1000 + u64::from(now.subsec_millis());
-                    if access_event.track_debug_until_date >= millis {
-                        res.push(Event::DebugEvent(
-                            self.access_to_debug(access_event.clone()),
-                        ));
-                    }
                 }
                 _ => res.push(e.clone()),
             }
         }
         res
-    }
-
-    fn access_to_debug(&self, access_event: AccessEvent) -> DebugEvent {
-        DebugEvent {
-            kind: "debug".to_string(),
-            time: access_event.time,
-            key: access_event.key,
-            user: access_event.user,
-            user_detail: access_event.user_detail,
-            value: access_event.value,
-            variation_index: access_event.variation_index,
-            version: access_event.version,
-            rule_index: access_event.rule_index,
-            reason: access_event.reason,
-        }
     }
 
     fn build_access(&self, events: &Vec<Event>) -> Access {
