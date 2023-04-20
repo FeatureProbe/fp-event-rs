@@ -40,7 +40,6 @@ mod tests {
             variation_index: 0,
             version: Some(1),
             rule_index: Some(1),
-            reason: Some("reason".to_string()),
             track_access_events: false,
         };
 
